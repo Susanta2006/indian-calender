@@ -3,6 +3,10 @@ Ind-Calender: This tool helps to find bengali tithis, festivals, eclipses, and w
 
 This is a real-world useful tool for Indians specially bengal peoples even my home has this problem no panjika so I decided to make it, as we are developers but I also took help from AI used prompt engineering to rectify errors and accuracy.
 
+# Descliamer
+In triple quoted texts ("""...""") remove them ore prelace them with the given contexts after installing properly all the libraries especially timezonefinder, if this library shows error, then go with the intial code, else, replace those functions with the quoted ones for better experience as its initially set for Asia/Kolkata timezone.
+Thank You
+
 # Images..
 
 # Version 1.0
