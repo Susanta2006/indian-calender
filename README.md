@@ -3,6 +3,10 @@ Ind-Calender: This tool helps to find bengali tithis, festivals, eclipses, and w
 
 This is a real-world useful tool for Indians specially bengal peoples even my home has this problem no panjika so I decided to make it, as we are developers but I also took help from AI used prompt engineering to rectify errors and accuracy.
 
-# Install required libraries and go..
+# Images..
 
+# Version 1.0
 <img width="1816" height="800" alt="Screenshot 2025-09-19 015429" src="https://github.com/user-attachments/assets/aaf5d261-3817-4ca0-ba53-eae324c758fb" />
+
+# Updated Version 1.1:
+<img width="1850" height="865" alt="Screenshot 2025-09-19 095539" src="https://github.com/user-attachments/assets/66173736-14c1-4313-9e90-84608dae848f" />
