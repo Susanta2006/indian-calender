@@ -12,7 +12,7 @@ import numpy as np
 
 ############################# BANNER #######
 banner_text = pyfiglet.figlet_format("Ind-Calendar")
-print(banner_text, "\n version 1.1 (added moon phase and Benagli Year)")
+print(banner_text, "\n version 1.1 (added moon phase and Benagli Year)\n (50% My Logic - 50% Prompt Engg.)")
 print()
 warnings.filterwarnings("ignore")
 ############################################
@@ -310,15 +310,16 @@ def bengali_panchang(date_input=None):
     eclipses = detect_eclipses(dt_local)
     bengali_year = compute_bengali_year(dt_local)
 
-    print(f"\n📅 Bengali Panchang for {city}, {state}: ({dt_local.strftime('%A, %d-%m-%Y')}, at {dt_local.strftime('%I:%M %p IST')})")
+    print(f"\n📅 Bengali Panchang for {city}, {state}:")
+    print(f"Today (English): {dt_local.strftime('%A, %d-%m-%Y')}, at {dt_local.strftime('%I:%M %p IST')}\n")
     print(f"----------------------------")
-    print(f"Today (Bengali): {bengali_month} {bengali_day}, {bengali_year} Bangabda\n")
-    print(f"Current Tithi: {tithi_num} ({paksha} Paksha)\n")
-    print("Tithi today:")
+    print(f"Bengali Date: {bengali_month} {bengali_day}, {bengali_year} Bangabda")
+    print(f"Paksha: {paksha} Paksha")
+    print(f"Current Tithi: {tithi_num}")
     tithi_events = get_tithi_events(dt_local)
     for tn, paksha, start, end in tithi_events:
-        print(f"  {tn} ({paksha} Paksha) → {start.strftime('%I:%M %p')} to {end.strftime('%I:%M %p')}\n")
-
+        print(f"Tithi Next:  {tn} ({paksha} Paksha) → {start.strftime('%I:%M %p')} to {end.strftime('%I:%M %p')}")
+    print(f"----------------------------")
     print(f"Nakshatra: {nakshatra}")
     print(f"Yoga: {yoga}")
     print(f"Karana: {karana}")
