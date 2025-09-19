@@ -13,4 +13,4 @@ Thank You
 <img width="1816" height="800" alt="Screenshot 2025-09-19 015429" src="https://github.com/user-attachments/assets/aaf5d261-3817-4ca0-ba53-eae324c758fb" />
 
 # Updated Version 1.1:
-<img width="1850" height="865" alt="Screenshot 2025-09-19 095539" src="https://github.com/user-attachments/assets/66173736-14c1-4313-9e90-84608dae848f" />
+<img width="1844" height="935" alt="Screenshot 2025-09-19 110151" src="https://github.com/user-attachments/assets/4ea1ca55-be8f-499b-9405-a9e98e706e75" />
