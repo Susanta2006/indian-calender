@@ -1,4 +1,3 @@
-# corrected_ind_calender.py
 from datetime import datetime, timedelta
 from skyfield.api import load, wgs84
 from skyfield.almanac import risings_and_settings, find_discrete, moon_phases
@@ -7,11 +6,13 @@ from zoneinfo import ZoneInfo
 import pyfiglet
 import warnings
 import geocoder
-from timezonefinder import TimezoneFinder
+import numpy as np
+
+#import timezonefinder
 
 ############################# BANNER #######
 banner_text = pyfiglet.figlet_format("Ind-Calendar")
-print(banner_text, "\n version 1.1")
+print(banner_text, "\n version 1.1 (added moon phase and Benagli Year)")
 print()
 warnings.filterwarnings("ignore")
 ############################################
@@ -27,30 +28,35 @@ print(
 )
 
 # ---------------- CONFIG ----------------
-# ---------------- CONFIG ----------------
+
 try:
-    g = geocoder.ip("me")   # detect location by IP
+    g = geocoder.ip("me")   # auto-detect location by IP
     if g.ok and g.latlng:
         latitude, longitude = g.latlng
         city = g.city if g.city else "Unknown City"
         state = g.state if g.state else "Unknown State"
-
-        # Detect timezone from coordinates
+        
+        """
         tf = TimezoneFinder()
         timezone_str = tf.timezone_at(lng=longitude, lat=latitude)
         if not timezone_str:
             timezone_str = "Asia/Kolkata"  # fallback
+            """
 
     else:
         # fallback (Agartala if detection fails)
         latitude, longitude = 23.8315, 91.2868
         city, state = "Agartala", "Tripura"
+        
+        """
         timezone_str = "Asia/Kolkata"
+        """
+        
 except Exception:
     latitude, longitude = 23.8315, 91.2868
     city, state = "Agartala", "Tripura"
-    timezone_str = "Asia/Kolkata"
-    
+    #timezone_str = "Asia/Kolkata"
+
 ts = load.timescale()
 eph = load("de421.bsp")
 earth, sun, moon = eph["earth"], eph["sun"], eph["moon"]
@@ -77,18 +83,28 @@ yogas = [
 karanas = ["Bava","Balava","Kaulava","Taitila","Garaja","Vanija","Vishti"]
 
 # ---------------- HELPERS ----------------
-def to_ist(dt): 
-    return dt.astimezone(ZoneInfo(timezone_str))
-def to_utc(dt): 
+def to_ist(dt):
+    return dt.astimezone(ZoneInfo("Asia/Kolkata")) #update this
+def to_utc(dt):
     return dt.astimezone(ZoneInfo("UTC"))
-def normalize_angle(angle): 
+def normalize_angle(angle):
     return angle % 360
-    
+
+def get_utc_times_for_local_day(dt_local):
+    local_zone = ZoneInfo("Asia/Kolkata")
+    local_midnight = datetime(dt_local.year, dt_local.month, dt_local.day, 0, 0, tzinfo=local_zone)
+    local_end = datetime(dt_local.year, dt_local.month, dt_local.day, 23, 59, 59, tzinfo=local_zone)
+    return local_midnight.astimezone(ZoneInfo("UTC")), local_end.astimezone(ZoneInfo("UTC"))
+
+"""
+def to_ist(dt):
+    return dt.astimezone(ZoneInfo(timezone_str))
 def get_utc_times_for_local_day(dt_local):
     local_zone = ZoneInfo(timezone_str)
     local_midnight = datetime(dt_local.year, dt_local.month, dt_local.day, 0, 0, tzinfo=local_zone)
     local_end = datetime(dt_local.year, dt_local.month, dt_local.day, 23, 59, 59, tzinfo=local_zone)
     return local_midnight.astimezone(ZoneInfo("UTC")), local_end.astimezone(ZoneInfo("UTC"))
+"""
 
 def get_sunrise_sunset(dt_local):
     f = risings_and_settings(eph, sun, location)
@@ -167,7 +183,7 @@ def get_festivals(dt, tithi_num, nakshatra):
 
 def compute_bengali_year(dt_local):
     # Pohela Boishakh falls on 14 April (sometimes 15 April in leap years)
-    pohela_boishakh = datetime(dt_local.year, 4, 14, tzinfo=ZoneInfo(timezone_str))
+    pohela_boishakh = datetime(dt_local.year, 4, 14, tzinfo=ZoneInfo("Asia/Kolkata")) #update this ZoneInfo(timezone_str)
     if dt_local >= pohela_boishakh:
         bengali_year = dt_local.year - 593
     else:
@@ -179,7 +195,7 @@ def compute_bengali_month_day(dt_local):
     def sidereal_sun_lon_on_date(d):
         sunrise, _ = get_sunrise_sunset(d)
         if sunrise is None:
-            sunrise = datetime(d.year, d.month, d.day, 6, tzinfo=ZoneInfo(timezone_str))
+            sunrise = datetime(d.year, d.month, d.day, 6, tzinfo=ZoneInfo("Asia/Kolkata")) #update this ZoneInfo(timezone_str)
         t = ts.from_datetime(to_utc(sunrise))
         tropical_lon = earth.at(t).observe(sun).apparent().ecliptic_latlon()[1].degrees
         return normalize_angle(tropical_lon - AYANAMSHA)
@@ -237,9 +253,50 @@ def detect_eclipses(dt_local):
                 in_eclipse=False; min_sep=999
     return results
 
+def get_tithi_events(dt_local):
+    """Return list of (tithi_num, paksha, start_time, end_time) for the day"""
+    t0_utc, t1_utc = get_utc_times_for_local_day(dt_local)
+    t0, t1 = ts.from_datetime(t0_utc), ts.from_datetime(t1_utc)
+
+    def tithi_index(t):
+        # Skyfield may pass array of times
+        t = np.atleast_1d(t)
+        res = []
+        for ti in t:
+            sun_lon = normalize_angle(earth.at(ti).observe(sun).apparent().ecliptic_latlon()[1].degrees)
+            moon_lon = normalize_angle(earth.at(ti).observe(moon).apparent().ecliptic_latlon()[1].degrees)
+            angle = normalize_angle(moon_lon - sun_lon)
+            # Add small epsilon to handle rounding issues
+            tithi = int(np.floor((angle + 1e-6) / 12))
+            res.append(tithi)
+        return np.array(res)
+
+    # Required by Skyfield
+    tithi_index.step_days = 0.25  # 6-hour step
+
+    times, indices = find_discrete(t0, t1, tithi_index)
+    results = []
+
+    for i in range(len(times)):
+        start = to_ist(times[i].utc_datetime().replace(tzinfo=ZoneInfo("UTC")))
+        tithi_num = indices[i] + 1
+        paksha = "Shukla" if tithi_num <= 15 else "Krishna"
+        if tithi_num > 15:
+            tithi_num -= 15
+
+        if i + 1 < len(times):
+            end = to_ist(times[i+1].utc_datetime().replace(tzinfo=ZoneInfo("UTC")))
+        else:
+            end = to_ist(t1.utc_datetime().replace(tzinfo=ZoneInfo("UTC")))
+
+        results.append((tithi_num, paksha, start, end))
+
+    return results
+
+
 # ---------------- MAIN FUNCTION ----------------
 def bengali_panchang(date_input=None):
-    dt_local = date_input or datetime.now(ZoneInfo("Asia/Kolkata"))
+    dt_local = date_input or datetime.now(ZoneInfo("Asia/Kolkata")) 
     sun_lon, moon_lon = sun_longitude(dt_local), moon_longitude(dt_local)
     tithi_num, paksha = compute_tithi(sun_lon, moon_lon)
     nakshatra = compute_nakshatra(moon_lon)
@@ -255,8 +312,13 @@ def bengali_panchang(date_input=None):
 
     print(f"\n📅 Bengali Panchang for {city}, {state}: ({dt_local.strftime('%A, %d-%m-%Y')}, at {dt_local.strftime('%I:%M %p IST')})")
     print(f"----------------------------")
-    print(f"Today (Bengali): {bengali_month} {bengali_day}, {bengali_year} Bangabda")
-    print(f"Tithi: {tithi_num} ({paksha} Paksha)")
+    print(f"Today (Bengali): {bengali_month} {bengali_day}, {bengali_year} Bangabda\n")
+    print(f"Current Tithi: {tithi_num} ({paksha} Paksha)\n")
+    print("Tithi today:")
+    tithi_events = get_tithi_events(dt_local)
+    for tn, paksha, start, end in tithi_events:
+        print(f"  {tn} ({paksha} Paksha) → {start.strftime('%I:%M %p')} to {end.strftime('%I:%M %p')}\n")
+
     print(f"Nakshatra: {nakshatra}")
     print(f"Yoga: {yoga}")
     print(f"Karana: {karana}")
@@ -288,4 +350,3 @@ def bengali_panchang(date_input=None):
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     bengali_panchang()
-
