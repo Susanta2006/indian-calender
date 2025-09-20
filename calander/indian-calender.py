@@ -348,44 +348,61 @@ def get_monthly_festivals(year, month):
     if month == 12: end_date = datetime(year + 1, 1, 1, tzinfo=ZoneInfo(ZONE))
     else: end_date = datetime(year, month + 1, 1, tzinfo=ZoneInfo(ZONE))
     
-    current_date = start_date
-    found_any = False
-    while current_date < end_date:
-        # Calculate daily parameters
-        moon_lon = moon_longitude(current_date)
-        nakshatra = compute_nakshatra(moon_lon)
-        _, _, rashi_index = compute_bengali_month_day(current_date, return_rashi_index=True)
-        lunar_month = lunar_months[rashi_index]
-        tithi_events = get_tithi_events(current_date)
-        
-        # Collect festivals
-        all_festivals_for_day = []
-        # Solar/Fixed
-        all_festivals_for_day.extend(get_festivals(current_date))
-        # Tithi-based
-        for tithi in tithi_events:
-            tithi_fests = get_festivals(current_date, lunar_month, tithi['paksha'], tithi['tithi_num'], nakshatra)
-            if tithi_fests:
-                for fest in tithi_fests:
-                    all_festivals_for_day.append((fest, tithi['start'], tithi['end']))
-        
-        # Print if any found
-        if all_festivals_for_day:
-            found_any = True
-            unique_festivals = set()
-            for item in all_festivals_for_day:
-                if isinstance(item, tuple):
-                    fest, start_t, end_t = item
-                    if fest not in unique_festivals:
-                        print(f"🎉 {fest} :  from --> {start_t.strftime('%d %b, %I:%M:%S %p')} to {end_t.strftime('%d %b, %I:%M:%S %p')}\n")
-                        unique_festivals.add(fest)
-                else:
-                    if item not in unique_festivals:
-                        print(f"🎉 {item}")
-                        unique_festivals.add(item)
-        current_date += timedelta(days=1)
+    # Get all tithi events for a wider window to ensure nothing is missed.
+    t_start_fetch = start_date - timedelta(days=5)
+    t_end_fetch = end_date + timedelta(days=5)
     
-    if not found_any:
+    all_tithi_events = []
+    current_fetch_date = t_start_fetch
+    
+    while current_fetch_date < t_end_fetch:
+        all_tithi_events.extend(get_tithi_events(current_fetch_date))
+        current_fetch_date += timedelta(days=1)
+    
+    # Now, process and filter unique festival events
+    found_festivals = []
+    unique_entries = set()
+    
+    for tithi_event in all_tithi_events:
+        # Only process events that start or end within the target month.
+        if tithi_event['start'].month != month and tithi_event['end'].month != month:
+            continue
+            
+        lunar_month_at_start = lunar_months[int(normalize_angle(sun_longitude(tithi_event['start']) - 24.25) // 30)]
+        paksha = tithi_event['paksha']
+        tithi_num = tithi_event['tithi_num']
+        nakshatra_at_start = compute_nakshatra(moon_longitude(tithi_event['start']))
+
+        fests = get_festivals(tithi_event['start'], lunar_month_at_start, paksha, tithi_num, nakshatra_at_start)
+        
+        for fest in fests:
+            # Create a unique key to prevent duplicates
+            key = (fest, tithi_event['start'], tithi_event['end'])
+            if key not in unique_entries:
+                found_festivals.append((fest, tithi_event['start'], tithi_event['end']))
+                unique_entries.add(key)
+                
+    # Add date-based festivals
+    current_date_solar = start_date
+    while current_date_solar < end_date:
+        solar_fests = get_festivals(current_date_solar)
+        for fest in solar_fests:
+            key = (fest, current_date_solar.date())
+            if key not in unique_entries:
+                found_festivals.append((fest, current_date_solar, current_date_solar))
+                unique_entries.add(key)
+        current_date_solar += timedelta(days=1)
+
+    # Sort and print
+    found_festivals.sort(key=lambda x: x[1])
+    
+    if found_festivals:
+        for fest, start_t, end_t in found_festivals:
+            if isinstance(start_t, datetime) and isinstance(end_t, datetime):
+                print(f"🎉 {fest} : from --> {start_t.strftime('%d %b, %I:%M:%S %p')} to {end_t.strftime('%d %b, %I:%M:%S %p')}\n")
+            else:
+                print(f"🎉 {fest}\n")
+    else:
         print("No major festivals found for this month.")
     print("------------------------------------------")
 
@@ -424,7 +441,18 @@ def daily_panchang(date_input=None):
         for tithi in tithi_events:
             print(f"  → Tithi {tithi['tithi_num']} ({tithi['paksha']} Paksha) runs from {tithi['start'].strftime('%I:%M %p')} to {tithi['end'].strftime('%I:%M %p')}")
     else:
-        print("  → No Tithi changes today.")
+        # Check if the current tithi spans the whole day
+        first_tithi_event = get_tithi_events(dt_local - timedelta(days=1))
+        found_tithi = False
+        if first_tithi_event:
+            for tithi in first_tithi_event:
+                if tithi['tithi_num'] == tithi_num_current and tithi['paksha'] == paksha:
+                    if tithi['end'] > datetime.now(ZoneInfo(ZONE)):
+                        print(f"  → Tithi {tithi_num_current} ({paksha} Paksha) began yesterday at {tithi['start'].strftime('%I:%M %p')} and continues through today.")
+                        found_tithi = True
+                        break
+        if not found_tithi:
+            print("  → The current Tithi spans the entire day.")
     print(f"------------------------------------------")
     print(f"Nakshatra: {nakshatra} | Yoga: {yoga} | Karana: {karana}")
     print(f"------------------------------------------")
